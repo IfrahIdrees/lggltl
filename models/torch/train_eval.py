@@ -112,7 +112,7 @@ def trainIters(in_lang, out_lang, encoder, decoder, samples, n_iters, max_length
     criterion = nn.NLLLoss()
 
     for i in range(1, n_iters + 1):
-        training_pair = training_pairs.next()
+        training_pair = next(training_pairs)
         input_variable = training_pair[0]
         target_variable = training_pair[1]
 
@@ -287,11 +287,11 @@ def crossValidation(in_lang, out_lang, encoder, decoder, samples, max_length, n_
         random.shuffle(samples)
 
     correct, total = 0, 0
-    fold_range = range(0, len(samples), int(len(samples) / n_folds))
+    fold_range = list(range(0, len(samples), int(len(samples) / n_folds)))
     fold_range.append(len(samples))
 
     print('Starting {0}-fold cross validation'.format(n_folds))
-    for f in xrange(n_folds):
+    for f in range(n_folds):
         print('Running cross validation fold {0}/{1}...'.format(f + 1, n_folds))
 
         encoder.train()

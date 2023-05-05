@@ -6,17 +6,30 @@ from lang import *
 from networks import *
 from train_eval import *
 from train_langmod import *
+import argparse
+
+def parseArguments():
+
+    # Necessary variables
+    parser.add_argument(
+        "--src_path", type=str, default="../../data/hard_pc_src_syn.txt'",
+        help="src path")
+    parser.add_argument(
+        "--tar_path", type=str, default="../../data/hard_pc_tar_syn.txt'",
+        help="src path")
+    args = parser.parse_args()
+    return parser, args
 
 use_cuda = torch.cuda.is_available()
+if use_cuda:
+    device = torch.device("cuda")
 
-src, tar = '../../data/hard_pc_src_syn.txt', '../../data/hard_pc_tar_syn.txt'
-# src, tar = '../../data/hard_pc_src.txt', '../../data/hard_pc_tar.txt'
-# src, tar = '../../data/hard_pc_src2.txt', '../../data/hard_pc_tar2.txt'
-# src, tar = '../../data/hard_pc_src_syn2.txt', '../../data/hard_pc_tar_syn2.txt'
-
+parser = argparse.ArgumentParser()
+parser, args = parseArguments()
+src, tar = args.src_path, args.tar_path
 
 SEED = 0 #int(sys.argv[1])
-MODE = 9 #int(sys.argv[2])
+MODE = 2 ## 2 for cross validation,  #9 for learning curve - fig 3
 GLOVE = True
 random.seed(SEED)
 torch.manual_seed(SEED) if not use_cuda else torch.cuda.manual_seed(SEED)
@@ -54,7 +67,7 @@ decoder1 = DecoderRNN(embed_size, hidden_size, output_lang.n_words)
 if use_cuda:
     encoder1 = encoder1.cuda()
     if GLOVE:
-        glove_encoder = glove_encoder.cuda()
+        glove_encoder = glove_encoder.to(device)
     attn_decoder1 = attn_decoder1.cuda()
     new_attn_decoder1 = new_attn_decoder1.cuda()
     decoder1 = decoder1.cuda()

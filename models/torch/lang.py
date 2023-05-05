@@ -41,8 +41,8 @@ def readLangs(lang1, lang2, reverse=False):
     print("Reading lines...")
 
     # Read the file and split into lines
-    src_lines = open(lang1, 'rb').read().strip().split('\n')
-    tar_lines = open(lang2, 'rb').read().strip().split('\n')
+    src_lines = open(lang1, 'r').read().strip().split('\n')
+    tar_lines = open(lang2, 'r').read().strip().split('\n')
     assert len(src_lines) == len(tar_lines)
 
     # Split every line into pairs and normalize
@@ -124,7 +124,7 @@ class Corpus(object):
 
 def vectors_for_input_language(lang):
     # source for this code: https://medium.com/@martinpella/how-to-use-pre-trained-word-embeddings-in-pytorch-71ca59249f76
-    glove_path = '/home/ng/workspace/lggltl/lggltl/glove.6B/'
+    glove_path = "../../glove.6B/"
     vectors = bcolz.open(glove_path + '6B.50.dat')[:]
     words = pickle.load(open(glove_path + '6B.50_words.pkl', 'rb'))
     word2idx = pickle.load(open(glove_path + '6B.50_idx.pkl', 'rb'))

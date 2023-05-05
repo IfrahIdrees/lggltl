@@ -51,7 +51,7 @@ class Seq2Seq:
         #    for i in range(self.beam_width):
         #        print ' '.join(map(lambda x: rev_tar.get(x, self.UNK), filter(lambda x: x > 1, p[i])))
         preds = [' '.join(map(lambda x: rev_tar.get(x, self.UNK), filter(lambda x: x > 1, p))) for p in preds]
-        print preds
+        print(preds)
 
     def cross_val(self):
         src_temp, tar_temp = tempfile.NamedTemporaryFile(delete=False), tempfile.NamedTemporaryFile(delete=False)
@@ -70,9 +70,9 @@ class Seq2Seq:
         FLAGS.train_src, FLAGS.train_tar = src_temp.name, tar_temp.name
             
         correct, total = 0, 0
-        print 'Starting {0}-fold cross validation'.format(FLAGS.folds)
+        print('Starting {0}-fold cross validation'.format(FLAGS.folds))
         for f in xrange(FLAGS.folds):
-            print 'Running cross validation fold {0}/{1}...'.format(f + 1, FLAGS.folds)
+            print('Running cross validation fold {0}/{1}...'.format(f + 1, FLAGS.folds))
             tf.reset_default_graph()
             random.seed(SEED)
             tf.set_random_seed(SEED)
@@ -110,17 +110,17 @@ class Seq2Seq:
 
         os.remove(src_temp.name)
         os.remove(tar_temp.name)
-        print '{0}-fold Cross Validation Accuracy: {1}/{2} = {3}%'.format(FLAGS.folds, correct, total, 100. * float(correct) / float(total))
+        print('{0}-fold Cross Validation Accuracy: {1}/{2} = {3}%'.format(FLAGS.folds, correct, total, 100. * float(correct) / float(total)))
 
     def compute_acc(self, zipped):
         correct, total = 0, 0
         for gt, pred in zipped:
-            print "'{0}' \t '{1}'".format(gt, pred)
+            print("'{0}' \t '{1}'".format(gt, pred))
             if gt == pred:
                 correct += 1
             total += 1
         acc = 100. * float(correct) / float(total)
-        print 'Accuracy: {0}/{1} = {2}%'.format(correct, total, acc)
+        print('Accuracy: {0}/{1} = {2}%'.format(correct, total, acc))
         return correct, total, acc
 
     def print_formatter(self, keys, vocab):
@@ -142,8 +142,8 @@ class Seq2Seq:
 
     def build_vocab(self):
         if not os.path.isfile(FLAGS.vocabs_path) or FLAGS.rebuild:
-            print 'Pre-built vocabularies not found and/or rebuild flag set to {0}'.format(FLAGS.rebuild)
-            print 'Building vocabularies...'
+            print('Pre-built vocabularies not found and/or rebuild flag set to {0}'.format(FLAGS.rebuild))
+            print('Building vocabularies...')
             
             # Load source and target training data
             with open(FLAGS.train_src, 'rb') as f:
@@ -174,7 +174,7 @@ class Seq2Seq:
                     
             return src_map, tar_map
         else:
-            print 'Pre-built vocabulary files found and/or rebuild flag set to {0}'.format(FLAGS.rebuild)
+            print('Pre-built vocabulary files found and/or rebuild flag set to {0}'.format(FLAGS.rebuild))
             with open(FLAGS.vocabs_path, 'rb') as f:
                 return pickle.load(f)
 
@@ -215,7 +215,7 @@ class Seq2Seq:
 
         def epoch_sampler():
             for e in xrange(FLAGS.epochs):
-                print 'Starting Epoch {0}/{1}'.format(e + 1, FLAGS.epochs)
+                print('Starting Epoch {0}/{1}'.format(e + 1, FLAGS.epochs))
                 b = base_sampler()
                 while True:
                     try:
@@ -276,7 +276,7 @@ class Seq2Seq:
             for i in range(self.bsz):
                 try:
                     rec = cli_sampler.next()
-                    print rec
+                    print(rec)
                     inputs.append(rec['input'])
                     outputs.append(rec['output'])
                     ground_truth.append(rec['output'])
@@ -293,7 +293,7 @@ class Seq2Seq:
                 outputs[i] += [self.STOP_ID] * (output_length - len(outputs[i]))
             return {'input:0': inputs, 'output:0': outputs}
 
-        print 'Finished data loading'
+        print('Finished data loading')
         return input_fn, feed_fn, test_feed_fn, human_feed_fn, ground_truth
 
     def make_cv_data_fns(self, fold_index):
@@ -355,7 +355,7 @@ class Seq2Seq:
 
         def epoch_sampler(sampler):
             for e in xrange(FLAGS.epochs):
-                print 'Starting Epoch {0}/{1}'.format(e + 1, FLAGS.epochs)
+                print('Starting Epoch {0}/{1}'.format(e + 1, FLAGS.epochs))
                 b = sampler()
                 while True:
                     try:
@@ -410,7 +410,7 @@ class Seq2Seq:
                 outputs[i] += [self.STOP_ID] * (output_length - len(outputs[i]))
             return {'input:0': inputs, 'output:0': outputs}
 
-        print 'Finished data loading'
+        print('Finished data loading')
         return input_fn, feed_fn, test_feed_fn, ground_truth
             
     def seq2seq_model_fn(self, mode, features, labels, params):

@@ -6,7 +6,8 @@ import torch.nn.functional as F
 import csv
 
 use_cuda = torch.cuda.is_available()
-
+if use_cuda:
+    device = torch.device("cuda")
 
 class EncoderRNN(nn.Module):
     def __init__(self, input_size, embed_size, hidden_size, dropout_p=0.2):
@@ -15,9 +16,9 @@ class EncoderRNN(nn.Module):
         self.hidden_size = hidden_size
         self.dropout_p = dropout_p
 
-        self.embedding = nn.Embedding(input_size, embed_size)
-        self.dropout = nn.Dropout(self.dropout_p)
-        self.gru = nn.GRU(embed_size, hidden_size)
+        self.embedding = nn.Embedding(input_size, embed_size).to(device)
+        self.dropout = nn.Dropout(self.dropout_p).to(device)
+        self.gru = nn.GRU(embed_size, hidden_size).to(device)
 
     def forward(self, input, hidden):
         embedded = self.embedding(input).view(1, 1, -1)
@@ -36,7 +37,7 @@ class EncoderRNN(nn.Module):
 
 def create_emb_layer(weights_matrix, non_trainable=False):
     num_embeddings, embedding_dim = weights_matrix.shape
-    emb_layer = nn.Embedding(num_embeddings, embedding_dim)
+    emb_layer = nn.Embedding(num_embeddings, embedding_dim).to(device)
     print(type(weights_matrix))
     emb_layer.load_state_dict({'weight': torch.FloatTensor(weights_matrix)})
     if non_trainable:
@@ -59,9 +60,13 @@ class TestEncoderRNN(nn.Module):
 
 
         # self.embedding = nn.Embedding(self.input_size, self.embed_size)
-        self.gru = nn.GRU(self.embed_size,self.hidden_size)
+        self.gru = nn.GRU(self.embed_size,self.hidden_size).to(device)
 
     def forward(self, input, hidden):
+        # print(input.get_device())
+        # print(self.gru.get_device())
+        # print(self.embedding.get_device())
+        # print(hidden.get_device())
         return self.gru(self.embedding(input).view(1, 1, -1), hidden)
         # embedded = self.embedding(input).view(1, 1, -1)
         # output = self.dropout(embedded)
@@ -94,11 +99,12 @@ class DecoderRNN(nn.Module):
         self.hidden_size = hidden_size
         self.output_size = output_size
 
-        self.embedding = nn.Embedding(self.embed_size, self.hidden_size)
-        self.dropout = nn.Dropout(self.dropout_p)
-        self.gru = nn.GRU(self.hidden_size, self.hidden_size)
-        self.out = nn.Linear(self.hidden_size, self.output_size)
-        self.softmax = nn.LogSoftmax(dim=1)
+        self.embedding = nn.Embedding(self.embed_size, self.hidden_size).to(device)
+        self.dropout = nn.Dropout(self.dropout_p).to(device)
+        self.gru = nn.GRU(self.hidden_size, self.hidden_size).to(device)
+        self.out = nn.Linear(self.hidden_size, self.output_size).to(device)
+        self.softmax = nn.LogSoftmax(dim=1).to(device)
+
 
     def forward(self, input, hidden, encoder_outputs):
         output = self.embedding(input).view(1, 1, -1)
@@ -125,12 +131,12 @@ class AttnDecoderRNN(nn.Module):
         self.output_size = output_size
         self.dropout_p = dropout_p
 
-        self.embedding = nn.Embedding(self.output_size, self.embed_size)
-        self.attn = nn.Linear(self.hidden_size * 2, 1)
-        self.attn_combine = nn.Linear(self.embed_size + self.hidden_size, self.hidden_size)
-        self.dropout = nn.Dropout(self.dropout_p)
-        self.gru = nn.GRU(self.embed_size + self.hidden_size, self.hidden_size)
-        self.out = nn.Linear(self.hidden_size, self.output_size)
+        self.embedding = nn.Embedding(self.output_size, self.embed_size).to(device)
+        self.attn = nn.Linear(self.hidden_size * 2, 1).to(device)
+        self.attn_combine = nn.Linear(self.embed_size + self.hidden_size, self.hidden_size).to(device)
+        self.dropout = nn.Dropout(self.dropout_p).to(device)
+        self.gru = nn.GRU(self.embed_size + self.hidden_size, self.hidden_size).to(device)
+        self.out = nn.Linear(self.hidden_size, self.output_size).to(device)
 
     def forward(self, input, hidden, encoder_outputs):
         embedded = self.embedding(input).view(1, 1, -1)
@@ -171,11 +177,11 @@ class NewAttnDecoderRNN(nn.Module):
         self.dropout_p = dropout_p
         self.max_length = max_length
 
-        self.embedding = nn.Embedding(self.output_size, self.embed_size)
-        self.attn = nn.Linear(self.embed_size + self.hidden_size, self.max_length)
-        self.dropout = nn.Dropout(self.dropout_p)
-        self.gru = nn.GRU(self.embed_size + self.hidden_size, self.hidden_size)
-        self.out = nn.Linear(self.hidden_size, self.output_size)
+        self.embedding = nn.Embedding(self.output_size, self.embed_size).to(device)
+        self.attn = nn.Linear(self.embed_size + self.hidden_size, self.max_length).to(device)
+        self.dropout = nn.Dropout(self.dropout_p).to(device)
+        self.gru = nn.GRU(self.embed_size + self.hidden_size, self.hidden_size).to(device)
+        self.out = nn.Linear(self.hidden_size, self.output_size).to(device)
         self.in_test = False
         self.writer = None
 
@@ -219,11 +225,11 @@ class CombinedAttnDecoderRNN(nn.Module):
         self.dropout_p = dropout_p
         self.max_length = max_length
 
-        self.embedding = nn.Embedding(self.output_size, self.embed_size)
-        self.attn = nn.Linear(self.embed_size + self.hidden_size*2, 1)
-        self.dropout = nn.Dropout(self.dropout_p)
-        self.gru = nn.GRU(self.embed_size + self.hidden_size, self.hidden_size)
-        self.out = nn.Linear(self.hidden_size, self.output_size)
+        self.embedding = nn.Embedding(self.output_size, self.embed_size).to(device)
+        self.attn = nn.Linear(self.embed_size + self.hidden_size*2, 1).to(device)
+        self.dropout = nn.Dropout(self.dropout_p).to(device)
+        self.gru = nn.GRU(self.embed_size + self.hidden_size, self.hidden_size).to(device)
+        self.out = nn.Linear(self.hidden_size, self.output_size).to(device)
 
     def forward(self, input, hidden, encoder_outputs):
         embedded = self.embedding(input).view(1, 1, -1)
@@ -259,11 +265,11 @@ class Langmod(nn.Module):
         self.hidden_size = hidden_size
         self.output_size = output_size
 
-        self.drop = nn.Dropout(0.5)
-        self.embed = nn.Embedding(output_size, embed_size)
-        self.fc = nn.Linear(embed_size, embed_size + hidden_size)
-        self.rnn = nn.GRU(embed_size + hidden_size, hidden_size)
-        self.decoder = nn.Linear(hidden_size, output_size)
+        self.drop = nn.Dropout(0.5).to(device)
+        self.embed = nn.Embedding(output_size, embed_size).to(device)
+        self.fc = nn.Linear(embed_size, embed_size + hidden_size).to(device)
+        self.rnn = nn.GRU(embed_size + hidden_size, hidden_size).to(device)
+        self.decoder = nn.Linear(hidden_size, output_size).to(device)
 
         self.init_weights()
 

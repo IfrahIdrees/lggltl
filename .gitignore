@@ -3,3 +3,11 @@ target/
 *.iml
 *.py~
 *.tsv
+
+glove.6B.zip
+jason/*
+glove.6B/*
+models/torch/*.txt
+models/torch/*.out
+models/torch/__pycache__/*
+
