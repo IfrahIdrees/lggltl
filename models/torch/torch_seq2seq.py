@@ -12,10 +12,10 @@ def parseArguments():
 
     # Necessary variables
     parser.add_argument(
-        "--src_path", type=str, default="../../data/hard_pc_src_syn.txt'",
+        "--src_path", type=str, default="../../data/hard_pc_src_syn.txt",
         help="src path")
     parser.add_argument(
-        "--tar_path", type=str, default="../../data/hard_pc_tar_syn.txt'",
+        "--tar_path", type=str, default="../../data/hard_pc_tar_syn.txt",
         help="src path")
     args = parser.parse_args()
     return parser, args
