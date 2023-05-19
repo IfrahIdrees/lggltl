@@ -19,3 +19,5 @@ Manipulation Domain:
 2. Expanded: '../../data/hard_pc_src_syn2.txt', '../../data/hard_pc_tar_syn2.txt'
 
 
+Results of training loss per epoch added in results_{domain}.txt
+Results of 5-fold cross validation, accuracy per fold added in results_{domain}.csv

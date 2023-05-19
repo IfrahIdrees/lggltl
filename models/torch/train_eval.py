@@ -11,7 +11,8 @@ import itertools
 
 from utils import *
 from train_langmod import *
-
+from operator import truediv
+import pandas as pd
 SOS_token = 0
 EOS_token = 1
 UNK_token = 2
@@ -41,11 +42,6 @@ def variablesFromPair(input_lang, output_lang, pair):
 teacher_forcing_ratio = 0.5
 
 
-# def train_classifer(input_variable, target_variable, encoder, classifier_network, classifier_optimizer, criterion, max_length):
-#     encoder_hidden = encoder.initHidden()
-#     encoder
-#     classifier_optimizer.zero_grad()
-#     input_length =
 
 def train(input_variable, target_variable, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, max_length):
     encoder_hidden = encoder.initHidden()
@@ -282,23 +278,32 @@ def resetWeights(m):
         m.reset_parameters()
 
 
-def crossValidation(in_lang, out_lang, encoder, decoder, samples, max_length, n_folds=5):
-    for _ in range(10):
-        random.shuffle(samples)
-
+def crossValidation(in_lang, out_lang, encoder, decoder, samples, max_length, n_folds=5, lang2ltl = False):
     correct, total = 0, 0
-    fold_range = list(range(0, len(samples), int(len(samples) / n_folds)))
-    fold_range.append(len(samples))
+    if not lang2ltl:
+        for _ in range(10):
+            random.shuffle(samples)
+        fold_range = list(range(0, len(samples), int(len(samples) / n_folds)))
+        fold_range.append(len(samples))
 
     print('Starting {0}-fold cross validation'.format(n_folds))
+    per_fold_accuracy = []
+    columns = [f"Fold num #{i}" for i in range(n_folds)]
+    columns.append("Mean")
+    columns.append("Std Dev")
+    df = pd.DataFrame(columns = columns)
     for f in range(n_folds):
         print('Running cross validation fold {0}/{1}...'.format(f + 1, n_folds))
 
         encoder.train()
         decoder.train()
 
-        train_samples = samples[:fold_range[f]] + samples[fold_range[f + 1]:]
-        val_samples = samples[fold_range[f]:fold_range[f + 1]]
+        if lang2ltl:
+            train_samples = samples["train"][f] #samples[f][0]
+            val_samples = samples["valid"][f] #samples[f][1]
+        else:
+            train_samples = samples[:fold_range[f]] + samples[fold_range[f + 1]:] ## train on 4 
+            val_samples = samples[fold_range[f]:fold_range[f + 1]]
 
         trainIters(in_lang, out_lang, encoder, decoder, train_samples, 10000, max_length, print_every=500)
 
@@ -310,9 +315,21 @@ def crossValidation(in_lang, out_lang, encoder, decoder, samples, max_length, n_
         correct += corr
         total += tot
 
+        per_fold_accuracy.append(corr/tot * 100.)
+
         encoder.apply(resetWeights)
         decoder.apply(resetWeights)
-    print('{0}-fold Cross Validation Accuracy: {1}/{2} = {3}%'.format(n_folds, correct, total, 100. * correct / total))
+    
+
+    mean_accuracy = 100. * correct / total
+    std_accuracy = np.std(per_fold_accuracy)
+    print('Average {0}-fold Cross Validation Accuracy: {1}/{2} = {3}%'.format(n_folds, correct, total, mean_accuracy))
+    print('{0}-fold Cross Validation Standard Deviation : {1}%'.format(n_folds, std_accuracy))
+    
+    per_fold_accuracy.append(mean_accuracy)
+    per_fold_accuracy.append(std_accuracy)
+    df.loc[len(df.index)] = per_fold_accuracy
+    df.to_csv("../../results.csv")
 
 
 def write_train_vs_test_hidden_params(in_lang, out_lang, encoder, decoder, train_samples, eval_samples, max_length):

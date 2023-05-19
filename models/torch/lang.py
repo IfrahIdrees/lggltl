@@ -4,6 +4,9 @@ import torch
 import bcolz
 import pickle
 import numpy as np
+import pickle
+import operator
+
 
 
 class Lang:
@@ -61,6 +64,33 @@ def readLangs(lang1, lang2, reverse=False):
 
     return input_lang, output_lang, pairs, max_len, max_tar_len
 
+def readPkl(lang1):
+    src_data = pickle.load(open(lang1,"rb"))
+    train_iter = src_data['train_iter']
+    max_src_len_train = max([len(p[0]) for p in train_iter])
+    max_tar_len_train = max([len(p[1]) for p in train_iter])
+    valid_iter = src_data['train_iter']
+    max_src_len_valid = max([len(p[0]) for p in valid_iter])
+    max_tar_len_valid = max([len(p[1]) for p in valid_iter])
+
+    max_src_len = max_src_len_train if max_src_len_train > max_src_len_valid else max_src_len_valid
+    max_tar_len = max_tar_len_train if max_tar_len_train > max_tar_len_valid else max_tar_len_valid
+    return train_iter, valid_iter, max_src_len, max_tar_len
+
+def prepareDataPkl(input_lang, output_lang, train_iter, valid_iter,index):
+    for lang_pair in train_iter:
+        input_lang.addSentence(lang_pair[0])
+        output_lang.addSentence(lang_pair[1])
+
+    for lang_pair in valid_iter:
+        input_lang.addSentence(lang_pair[0])
+        output_lang.addSentence(lang_pair[1])
+    
+    print(f"Counted words for part {index} part : ")
+    print(input_lang.name, input_lang.n_words)
+    print(output_lang.name, output_lang.n_words)
+    return input_lang, output_lang
+    
 
 def prepareData(lang1, lang2, reverse=False):
     input_lang, output_lang, pairs, max_len, max_tar_len = readLangs(lang1, lang2, reverse)

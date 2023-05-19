@@ -7,16 +7,28 @@ from networks import *
 from train_eval import *
 from train_langmod import *
 import argparse
+import re
 
 def parseArguments():
 
-    # Necessary variables
-    parser.add_argument(
-        "--src_path", type=str, default="../../data/hard_pc_src_syn.txt",
+    subparsers = parser.add_subparsers(dest='dataset')
+    subparsers.required = True  # required since 3.7
+
+    #  subparser for lggltl dataset
+    parser_dump = subparsers.add_parser('lggltl')
+    parser_dump.add_argument(
+        "--src_file_path", type=str, default="../../data/hard_pc_src.txt",
         help="src path")
-    parser.add_argument(
-        "--tar_path", type=str, default="../../data/hard_pc_tar_syn.txt",
+    parser_dump.add_argument(
+        "--tar_file_path", type=str, default="../../data/hard_pc_tar.txt",
         help="src path")
+
+    #  subparser for lang2ltl dataset
+    parser_upload = subparsers.add_parser('lang2ltl')
+    parser_upload.add_argument(
+        "--src_dir_path", type=str, default="../../data/osm/lang2ltl/boston/",
+        help="src path")
+    
     args = parser.parse_args()
     return parser, args
 
@@ -26,7 +38,11 @@ if use_cuda:
 
 parser = argparse.ArgumentParser()
 parser, args = parseArguments()
-src, tar = args.src_path, args.tar_path
+if args.dataset == "lggltl":
+    src, tar = args.src_file_path, args.tar_file_path
+else:
+    src = args.src_dir_path
+
 
 SEED = 0 #int(sys.argv[1])
 MODE = 2 ## 2 for cross validation,  #9 for learning curve - fig 3
@@ -35,23 +51,51 @@ random.seed(SEED)
 torch.manual_seed(SEED) if not use_cuda else torch.cuda.manual_seed(SEED)
 print('Running with random seed {0}'.format(SEED))
 
-input_lang, output_lang, pairs, MAX_LENGTH, MAX_TAR_LENGTH = prepareData(src, tar, False)
-random.shuffle(pairs)
+is_lang2ltl = args.dataset == "lang2ltl"
+print(is_lang2ltl)
+if is_lang2ltl:
+    pairs = {
+        "train": [],
+        "valid": []
+    }
+    input_lang = Lang(src)
+    output_lang = Lang(src)
+    MAX_LENGTH, MAX_TAR_LENGTH = -math.inf, -math.inf
+    index = 0
+    for path in os.listdir(src):
+        index+=1
+    # check if current path is a file
+        filename = os.path.join(src, path)
+        if "utt" in filename and os.path.isfile(filename):
+            print("filename", filename)
+            train_iter, valid_iter, curr_max_src_len, curr_max_tar_len  = readPkl(filename)
+            pairs["train"].append(train_iter)
+            pairs["valid"].append(valid_iter)
+            print(curr_max_src_len, curr_max_tar_len)
+            if MAX_LENGTH < curr_max_src_len:
+                MAX_LENGTH = curr_max_tar_len
+
+            if MAX_TAR_LENGTH < curr_max_tar_len:
+                MAX_TAR_LENGTH = curr_max_tar_len
+
+            input_lang, output_lang = prepareDataPkl(input_lang, output_lang, train_iter, valid_iter,index)
+    MAX_LENGTH = int(MAX_LENGTH)
+    MAX_TAR_LENGTH = int(MAX_TAR_LENGTH)
+            # res.append(path)
+    # readPkl(lang1, pairs)
+    # exit()
+else:
+    input_lang, output_lang, pairs, MAX_LENGTH, MAX_TAR_LENGTH = prepareData(src, tar, False)
+if not is_lang2ltl:
+    random.shuffle(pairs)
+
 
 # adding this code so the list order is the same for all tests irrespective of further calls to random
 # in setting up the networks.
 number_of_tests = 10
-# list_of_indices = range(len(list(pairs)))
-# list_of_orders = []
-# for i in range(number_of_tests):
-#     # we generate a list of random orders that is consistent across runs of all test methods
-#     random.shuffle(list_of_indices)
-#     temp = list(list_of_indices)
-#     list_of_orders.append(temp)
 
 
 print('Maximum source sentence length: {0}'.format(MAX_LENGTH))
-print(random.choice(pairs))
 
 embed_size = 50
 hidden_size = 256
@@ -90,7 +134,7 @@ def main():
         evaluateTraining(input_lang, output_lang, glove_encoder, attn_decoder1, pairs, MAX_LENGTH)
     elif MODE == 2:
         print('Running cross validation on encoder and BA decoder...')
-        crossValidation(input_lang, output_lang, encoder1, attn_decoder1, pairs, MAX_LENGTH)
+        crossValidation(input_lang, output_lang, encoder1, attn_decoder1, pairs, MAX_LENGTH, lang2ltl=is_lang2ltl)
     elif MODE == 3:
         print('Running cross validation on encoder and vanilla decoder...')
         crossValidation(input_lang, output_lang, encoder1, decoder1, pairs, MAX_LENGTH)
