@@ -11,6 +11,7 @@ models/torch/*.txt
 models/torch/*.out
 models/torch/__pycache__/*
 
-*.csv
-*.txt
+
 models/torch/lang_normalized_input.py
+/*.csv
+/*.txt
