@@ -12,10 +12,14 @@
             "console": "integratedTerminal",
             "cwd": "${fileDirname}",
             "justMyCode": true,
-            "args":[
-                "--src_path", "../../data/osm/lang2ltl/boston/",
-                "--lang2ltl", "False"
-            ]
+            "args":
+            [
+            "lang2ltl", 
+            "--src_dir_path","../../data/osm/lang2ltl/boston/"
+            // "lggltl",
+            // "--src_file_path", "../../data/hard_pc_src.txt",
+            // "--tar_file_path", "../../data/hard_pc_tar.txt"
+            ],
         }
     ]
 }

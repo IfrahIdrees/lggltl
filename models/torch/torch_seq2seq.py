@@ -28,6 +28,11 @@ def parseArguments():
     parser_upload.add_argument(
         "--src_dir_path", type=str, default="../../data/osm/lang2ltl/boston/",
         help="src path")
+    parser_upload.add_argument(
+        "--is_load", type=bool, default=False,
+        help="is_load")
+    
+    # is_load = False
     
     args = parser.parse_args()
     return parser, args
@@ -96,7 +101,6 @@ number_of_tests = 10
 
 
 print('Maximum source sentence length: {0}'.format(MAX_LENGTH))
-
 embed_size = 50
 hidden_size = 256
 if GLOVE:
@@ -122,6 +126,9 @@ CLI = False
 
 
 def main():
+    global encoder1
+    global attn_decoder1
+
     if MODE == 0:
         trainIters(input_lang, output_lang, encoder1, attn_decoder1, pairs, 10000, MAX_LENGTH, print_every=500)
         encoder1.eval()
@@ -133,8 +140,21 @@ def main():
         attn_decoder1.eval()
         evaluateTraining(input_lang, output_lang, glove_encoder, attn_decoder1, pairs, MAX_LENGTH)
     elif MODE == 2:
+        print("is load ", args.is_load,)
+        
+        if args.is_load == True:
+            p = pathlib.Path("../checkpoints")
+            fn = "encoder.pt" # I don't know what is your fn
+            filepath = p / fn
+            encoder1 = torch.load(filepath)
+
+            fn = "decoder.pt" # I don't know what is your fn
+            filepath = p / fn
+            attn_decoder1 = torch.load(filepath)
+
+
         print('Running cross validation on encoder and BA decoder...')
-        crossValidation(input_lang, output_lang, encoder1, attn_decoder1, pairs, MAX_LENGTH, lang2ltl=is_lang2ltl)
+        crossValidation(input_lang, output_lang, encoder1, attn_decoder1, pairs, MAX_LENGTH, lang2ltl=is_lang2ltl, is_load = args.is_load) #False)
     elif MODE == 3:
         print('Running cross validation on encoder and vanilla decoder...')
         crossValidation(input_lang, output_lang, encoder1, decoder1, pairs, MAX_LENGTH)

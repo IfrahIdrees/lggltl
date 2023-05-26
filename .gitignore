@@ -15,3 +15,6 @@ models/torch/__pycache__/*
 models/torch/lang_normalized_input.py
 /*.csv
 /*.txt
+models/checkpoints*
+models/torch/training*
+models/torch/create_json.py

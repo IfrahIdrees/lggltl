@@ -62,11 +62,14 @@ def timeSince(since, percent):
     return '%s (- %s)' % (asMinutes(s), asMinutes(rs))
 
 
-def showPlot(points):
+def showPlot(points, filepath=None, is_multiple =False):
     plt.figure()
     fig, ax = plt.subplots()
-    # this locator puts ticks at regular intervals
-    loc = ticker.MultipleLocator(base=0.2)
-    ax.yaxis.set_major_locator(loc)
-    plt.plot(points)
-    plt.show()
+    if is_multiple:
+        plt.plot(points[0][0], points[0][1], label = "train loss")
+        plt.plot(points[1][0], points[1][1], label = "valid loss")
+    else:
+        plt.plot(points[0], points[1], label = "train loss")
+    ax.legend()
+    plt.savefig(filepath)
+    plt.close()

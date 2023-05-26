@@ -13,11 +13,13 @@ from utils import *
 from train_langmod import *
 from operator import truediv
 import pandas as pd
+import json
 SOS_token = 0
 EOS_token = 1
 UNK_token = 2
 
 use_cuda = torch.cuda.is_available()
+import pathlib
 
 
 def indexesFromSentence(lang, sentence):
@@ -96,47 +98,181 @@ def train(input_variable, target_variable, encoder, decoder, encoder_optimizer, 
     return loss.item() / target_length
 
 
-def trainIters(in_lang, out_lang, encoder, decoder, samples, n_iters, max_length, print_every=1000, plot_every=100, learning_rate=0.001):
+def trainIters(in_lang, out_lang, encoder, decoder, samples, n_iters, max_length, print_every=1000, plot_every=10000, learning_rate=0.000001, fold=None, epochs = 5, val_samples = None,
+                starting_iter = 0, starting_epoch = 0):
     start = time.time()
     plot_losses = []
-    print_loss_total = 0  # Reset every print_every
-    plot_loss_total = 0  # Reset every plot_every
+    x_losses = []
 
     encoder_optimizer = optim.Adam(encoder.parameters(), lr=learning_rate)
     decoder_optimizer = optim.Adam(decoder.parameters(), lr=learning_rate)
     training_pairs = itertools.cycle(iter([variablesFromPair(in_lang, out_lang, s) for s in samples]))
     criterion = nn.NLLLoss()
 
-    for i in range(1, n_iters + 1):
-        training_pair = next(training_pairs)
-        input_variable = training_pair[0]
-        target_variable = training_pair[1]
+    epoch_losses = []
+    x_epoch_losses = []
+    # exit()
+    # start = True
+    # starting_epoch = starting_epoch
+    # for epoch in range(epochs):
+    # print("before while")
+    while starting_epoch < epochs:
+        # print("starting epoch")
+        encoder.train()
+        decoder.train()
 
-        loss = train(input_variable, target_variable, encoder,
-                     decoder, encoder_optimizer, decoder_optimizer, criterion, max_length)
-        print_loss_total += loss
-        plot_loss_total += loss
+        print_loss_total = 0  # Reset every print_every
+        plot_loss_total = 0  # Reset every plot_every
+        i = starting_iter + 1
+        
+        while i < n_iters:
+            # print(i)
+            # exit()
+        # for i in range(1, n_iters + 1):
+            # if i == 3000:
+            #     break
+            training_pair = next(training_pairs)
+            input_variable = training_pair[0]
+            target_variable = training_pair[1]
 
-        if i % print_every == 0:
-            print_loss_avg = print_loss_total / print_every
-            print_loss_total = 0
-            print('%s (%d %d%%) %.4f' % (timeSince(start, i / n_iters),
-                                         i, i / n_iters * 100, print_loss_avg))
+            loss = train(input_variable, target_variable, encoder,
+                        decoder, encoder_optimizer, decoder_optimizer, criterion, max_length)
+            print_loss_total += loss
+            plot_loss_total += loss
 
-        if i % plot_every == 0:
-            plot_loss_avg = plot_loss_total / plot_every
-            plot_losses.append(plot_loss_avg)
-            plot_loss_total = 0
+            if i % print_every == 0:
+                print_loss_avg = print_loss_total / print_every
+                print_loss_total = 0
+                print('%s (%d %d%%) %.4f' % (timeSince(start, i / n_iters),
+                                            i, i / n_iters * 100, print_loss_avg))
+            # print("i",i, "mod", i % print_every, i % plot_every)
+            # print(print_every, plot_every)
+            if i % plot_every == 0:
+                plot_loss_avg = plot_loss_total / plot_every
+                plot_losses.append(plot_loss_avg)
+                x_losses.append(epoch*n_iters+ i)
+                plot_loss_total = 0
+                print("plot losses are, ",plot_losses)
+                showPlot([x_losses,plot_losses], "training.png")
+                p = pathlib.Path("../checkpoints")
+                p.mkdir(parents=True, exist_ok=True)
+                fn = f"encoder_e{epoch}.pt" # save last epoch
+                filepath = p / fn
+                torch.save(encoder, filepath)
+
+                fn = f"encoder.pt" # save last epoch
+                filepath = p / fn
+                torch.save(encoder, filepath)
+
+                fn = f"decoder_e{epoch}.pt" # I don't know what is your fn
+                filepath = p / fn
+                torch.save(decoder, filepath)
+
+                fn = f"decoder.pt" # I don't know what is your fn
+                filepath = p / fn
+                torch.save(decoder, filepath)
+
+                
+                fn = "meta_information.txt" # I don't know what is your fn
+                filepath = p / fn
+                with filepath.open("a", encoding ="utf-8") as f:
+                    f.writelines(f"fold: {fold},epoch: {epoch}, iter: {i}, train loss: {plot_losses[-1]}\n")
+
+                fn = "meta_information.json" # I don't know what is your fn
+                filepath = p / fn
+                
+                dict = {
+                    "fold": fold, 
+                    "epoch":epoch,
+                    "iter": i , 
+                    "train_loss": plot_losses[-1]
+                }
+
+                # Serializing json
+                json_object = json.dumps(dict, indent=4)
+                
+                with filepath.open("w", encoding ="utf-8") as fp:
+                    fp.write(json_object)
+            i+=1
+        
+        
+        fn = f"encoder_e{epoch}.pt" # I don't know what is your fn
+        filepath = p / fn
+        torch.save(encoder, filepath)
+
+        fn = f"encoder.pt" # I don't know what is your fn
+        filepath = p / fn
+        torch.save(encoder, filepath)
+        
+        fn = f"decoder_e{epoch}.pt" # I don't know what is your fn
+        filepath = p / fn
+        torch.save(decoder, filepath)
+
+        fn = f"decoder.pt" # I don't know what is your fn
+        filepath = p / fn
+        torch.save(decoder, filepath)
 
 
-def evaluate(input_lang, output_lang, encoder, decoder, sentence, max_length):
+        print("starting validation loss calculation")
+        encoder.eval()
+        decoder.eval()
+        corr, tot, acc, loss = evaluateSamples(in_lang, out_lang, encoder, decoder, val_samples, max_length, criterion = criterion)
+        print('Fold #{0}, Epoch # {4} ,Val Accuracy: {1}/{2} = {3}%'.format(fold + 1, corr, tot, 100. * acc, epoch))
+        print('Fold #{0}, Epoch # {2},Val Loss: {1}'.format(fold + 1, loss, epoch))
+        epoch_losses.append(loss)
+        x_epoch_losses.append((epoch+1)*n_iters)
+
+        fn = "meta_information.txt" # I don't know what is your fn
+        filepath = p / fn
+        with filepath.open("a", encoding ="utf-8") as f:
+            f.writelines(f"fold: {fold}, epoch: {epoch}, iter: {i} , epoch loss: {epoch_losses[-1]}\n")
+        
+        fn = "meta_information.json" # I don't know what is your fn
+        filepath = p / fn
+        
+        dict = {
+            "fold": fold, 
+            "epoch":epoch,
+            "iter": i , 
+            "epoch_loss": plot_losses[-1]
+        }
+
+        # Serializing json
+        json_object = json.dumps(dict, indent=4)
+        
+        with filepath.open("w", encoding ="utf-8") as fp:
+            fp.write(json_object)
+        # correct += corr
+        # total += tot
+        plot = []
+        plot.append([x_losses, plot_losses])
+        plot.append([x_epoch_losses, epoch_losses])
+        print("plot_losses", plot_losses)
+        print("x_losses", x_losses)
+        print("epoch_losses", epoch_losses)
+        print("x_epoch_losses", x_epoch_losses)
+        showPlot(plot, "epoch.jpg", is_multiple=True)
+        print("ended the epoch ")
+        epoch+=1
+
+    return criterion
+
+
+def evaluate(input_lang, output_lang, encoder, decoder, sentence, max_length, criterion=None, target_ltl = None):
     input_variable = variableFromSentence(input_lang, ' '.join(list(reversed(sentence.split()))))
+    if target_ltl != None:
+        target_variable = variableFromSentence(output_lang, target_ltl)
+        # print(target_variable)
+        target_length = target_variable.size()[0]
+        # print(target_length)
+
     input_length = input_variable.size()[0]
     encoder_hidden = encoder.initHidden()
 
     encoder_outputs = Variable(torch.zeros(max_length, encoder.hidden_size))
     encoder_outputs = encoder_outputs.cuda() if use_cuda else encoder_outputs
 
+    loss = 0
     for ei in range(input_length):
         encoder_output, encoder_hidden = encoder(input_variable[ei],
                                                  encoder_hidden)
@@ -167,7 +303,10 @@ def evaluate(input_lang, output_lang, encoder, decoder, sentence, max_length):
         decoder_input = Variable(torch.LongTensor([[ni]]))
         decoder_input = decoder_input.cuda() if use_cuda else decoder_input
 
-    return decoded_words, decoder_attentions[:di + 1]
+        if di < target_length:
+            loss += criterion(decoder_output, target_variable[di])
+
+    return decoded_words, decoder_attentions[:di + 1], loss.item() / target_length
 
 
 def evaluate2(input_lang, output_lang, encoder, decoder, sentence, max_length):
@@ -259,18 +398,20 @@ def evaluateTraining(input_lang, output_lang, encoder, decoder, pairs, max_lengt
     print('Training Accuracy: {0}/{1} = {2}%'.format(corr, tot, corr / tot))
 
 
-def evaluateSamples(input_lang, output_lang, encoder, decoder, samples, max_length):
-    corr, tot = 0, 0
+def evaluateSamples(input_lang, output_lang, encoder, decoder, samples, max_length, criterion=None):
+    corr, tot, loss = 0, 0, 0
     for p in samples:
-        output_words, attentions = evaluate(input_lang, output_lang, encoder, decoder, p[0], max_length)
+        output_words, attentions, current_loss = evaluate(input_lang, output_lang, encoder, decoder, p[0], max_length, criterion = criterion, target_ltl = p[1])
         output_words = ' '.join(output_words[:-1])
+        loss+=current_loss
         # print((output_words, p[1]))
         if output_words == p[1]:
             corr += 1
         # else:
             # print((p[0], output_words, p[1]))
         tot += 1
-    return corr, tot, corr / tot
+    loss = loss/len(samples)
+    return corr, tot, corr / tot, loss
 
 
 def resetWeights(m):
@@ -278,7 +419,7 @@ def resetWeights(m):
         m.reset_parameters()
 
 
-def crossValidation(in_lang, out_lang, encoder, decoder, samples, max_length, n_folds=5, lang2ltl = False):
+def crossValidation(in_lang, out_lang, encoder, decoder, samples, max_length, n_folds=5, lang2ltl = False, is_load = False):
     correct, total = 0, 0
     if not lang2ltl:
         for _ in range(10):
@@ -286,31 +427,73 @@ def crossValidation(in_lang, out_lang, encoder, decoder, samples, max_length, n_
         fold_range = list(range(0, len(samples), int(len(samples) / n_folds)))
         fold_range.append(len(samples))
 
+
+    if is_load:
+        # print("loading!")
+        p = pathlib.Path("../checkpoints")
+        fn = "meta_information.json" # I don't know what is your fn
+        filepath = p / fn
+ 
+        # Opening JSON file
+        with filepath.open("r", encoding ="utf-8") as fp:
+        # with open('sample.json', 'r') as openfile:
+        
+            # Reading from json file
+            json_object = json.load(fp)
+ 
+        print(json_object)
+        # print(type(json_object))
+        starting_fold = json_object["fold"]
+        starting_iter = json_object["iter"]
+        starting_epoch = json_object["epoch"]
+        print("Starting epoch is", starting_epoch)
+        # exit()
+    else:
+        starting_fold = 0
+        starting_iter = 0
+        starting_epoch = json_object["epoch"]
+
     print('Starting {0}-fold cross validation'.format(n_folds))
     per_fold_accuracy = []
-    columns = [f"Fold num #{i}" for i in range(n_folds)]
+    columns = [f"Fold num #{i}" for i in range(1)]
     columns.append("Mean")
     columns.append("Std Dev")
     df = pd.DataFrame(columns = columns)
-    for f in range(n_folds):
+    
+    f = starting_fold
+    while f < n_folds:
+    # for f in range(n_folds):
+        if f+1 > 1:
+            print("here")
+            break
+        a = list(range(n_folds))
         print('Running cross validation fold {0}/{1}...'.format(f + 1, n_folds))
+
 
         encoder.train()
         decoder.train()
 
         if lang2ltl:
-            train_samples = samples["train"][f] #samples[f][0]
+            train_samples = []
+            a.remove(f)
+            for fold in a:
+                train_samples.extend(samples["train"][fold]) #samples[f][0]
+
             val_samples = samples["valid"][f] #samples[f][1]
         else:
             train_samples = samples[:fold_range[f]] + samples[fold_range[f + 1]:] ## train on 4 
             val_samples = samples[fold_range[f]:fold_range[f + 1]]
 
-        trainIters(in_lang, out_lang, encoder, decoder, train_samples, 10000, max_length, print_every=500)
+        # learning_rate=0.00001
+        # plot_every=20000
+        criterion = trainIters(in_lang, out_lang, encoder, decoder, train_samples, 38930*4, max_length, 
+                                print_every=1000, plot_every=20000, fold=f, val_samples=val_samples,
+                                starting_iter= starting_iter, starting_epoch=starting_epoch)
 
         encoder.eval()
         decoder.eval()
 
-        corr, tot, acc = evaluateSamples(in_lang, out_lang, encoder, decoder, val_samples, max_length)
+        corr, tot, acc, loss = evaluateSamples(in_lang, out_lang, encoder, decoder, val_samples, max_length, criterion= criterion)
         print('Cross validation fold #{0} Accuracy: {1}/{2} = {3}%'.format(f + 1, corr, tot, 100. * acc))
         correct += corr
         total += tot
@@ -319,13 +502,16 @@ def crossValidation(in_lang, out_lang, encoder, decoder, samples, max_length, n_
 
         encoder.apply(resetWeights)
         decoder.apply(resetWeights)
-    
+        f+=1
 
     mean_accuracy = 100. * correct / total
     std_accuracy = np.std(per_fold_accuracy)
     print('Average {0}-fold Cross Validation Accuracy: {1}/{2} = {3}%'.format(n_folds, correct, total, mean_accuracy))
     print('{0}-fold Cross Validation Standard Deviation : {1}%'.format(n_folds, std_accuracy))
     
+    # print(per_fold_accuracy, type(per_fold_accuracy))
+    # print(mean_accuracy, type(mean_accuracy))
+    # print(std_accuracy, type(std_accuracy))
     per_fold_accuracy.append(mean_accuracy)
     per_fold_accuracy.append(std_accuracy)
     df.loc[len(df.index)] = per_fold_accuracy
