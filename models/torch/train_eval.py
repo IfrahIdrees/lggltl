@@ -14,6 +14,7 @@ from train_langmod import *
 from operator import truediv
 import pandas as pd
 import json
+
 SOS_token = 0
 EOS_token = 1
 UNK_token = 2
@@ -113,10 +114,10 @@ def trainIters(in_lang, out_lang, encoder, decoder, samples, n_iters, max_length
     x_epoch_losses = []
     # exit()
     # start = True
-    # starting_epoch = starting_epoch
+    epoch = starting_epoch
     # for epoch in range(epochs):
     # print("before while")
-    while starting_epoch < epochs:
+    while epoch < epochs:
         # print("starting epoch")
         encoder.train()
         decoder.train()
@@ -129,8 +130,8 @@ def trainIters(in_lang, out_lang, encoder, decoder, samples, n_iters, max_length
             # print(i)
             # exit()
         # for i in range(1, n_iters + 1):
-            # if i == 3000:
-            #     break
+            # if i == 143000:
+                # break
             training_pair = next(training_pairs)
             input_variable = training_pair[0]
             target_variable = training_pair[1]
@@ -304,7 +305,8 @@ def evaluate(input_lang, output_lang, encoder, decoder, sentence, max_length, cr
         decoder_input = decoder_input.cuda() if use_cuda else decoder_input
 
         if di < target_length:
-            loss += criterion(decoder_output, target_variable[di])
+            if criterion != None:
+                loss += criterion(decoder_output, target_variable[di])
 
     return decoded_words, decoder_attentions[:di + 1], loss.item() / target_length
 
@@ -374,12 +376,14 @@ def evaluate2(input_lang, output_lang, encoder, decoder, sentence, max_length):
     return decoded_words[1:], None
 
 
-def evaluateRandomly(input_lang, output_lang, encoder, decoder, pairs, max_length, n=10):
+def evaluateRandomly(input_lang, output_lang, encoder, decoder, p, max_length, n=10):
     for i in range(n):
-        pair = random.choice(pairs)
+        pair = random.choice(p)
         print('>', pair[0])
         print('=', pair[1])
-        output_words, attentions = evaluate(input_lang, output_lang, encoder, decoder, pair[0], max_length)
+        # output_words, attentions = evaluate(input_lang, output_lang, encoder, decoder, pair[0], max_length)
+        # output_words, attentions = evaluate(input_lang, output_lang, encoder, decoder, pair[0], max_length)
+        output_words, attentions, current_loss = evaluate(input_lang, output_lang, encoder, decoder, pair[0], max_length, target_ltl = pair[1])
         output_sentence = ' '.join(output_words)
         print('<', output_sentence)
         print('')
@@ -451,7 +455,7 @@ def crossValidation(in_lang, out_lang, encoder, decoder, samples, max_length, n_
     else:
         starting_fold = 0
         starting_iter = 0
-        starting_epoch = json_object["epoch"]
+        starting_epoch = 0
 
     print('Starting {0}-fold cross validation'.format(n_folds))
     per_fold_accuracy = []
