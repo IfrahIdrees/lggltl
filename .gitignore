@@ -18,3 +18,5 @@ models/torch/lang_normalized_input.py
 models/checkpoints*
 models/torch/training*
 models/torch/create_json.py
+models/torch/train_eval.py
+models/torch/epoch.jpg

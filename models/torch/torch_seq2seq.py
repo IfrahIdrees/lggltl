@@ -50,7 +50,7 @@ else:
 
 
 SEED = 0 #int(sys.argv[1])
-MODE = 2 ##-1 for manual check## 2 for cross validation,  #9 for learning curve - fig 3
+MODE = -1 #2 #-1 #2 ##-1 for manual check## 2 for cross validation,  #9 for learning curve - fig 3
 GLOVE = True
 random.seed(SEED)
 torch.manual_seed(SEED) if not use_cuda else torch.cuda.manual_seed(SEED)
@@ -101,7 +101,7 @@ number_of_tests = 10
 
 
 print('Maximum source sentence length: {0}'.format(MAX_LENGTH))
-embed_size = 50
+embed_size = 200 #50
 hidden_size = 256
 if GLOVE:
     glove_map = vectors_for_input_language(input_lang)
@@ -123,30 +123,53 @@ if use_cuda:
 
 SAVE = False
 CLI = False
+SUBSET = False #True
 
 
 def main():
+    # print("dataset length", len(pairs))
     global encoder1
     global attn_decoder1
-
+    # print("length of p", len(pairs["valid"]))
+    # valid_iter = p["valid"][0]
+    print("length of valid_iter", len(pairs["valid"][0]))
+    # exit()
     if MODE == -1:
-        # if args.is_load == True:
-        #     p = pathlib.Path("../checkpoints")
-        #     fn = "encoder.pt" # I don't know what is your fn
-        #     filepath = p / fn
-        #     encoder1 = torch.load(filepath)
+        if args.is_load == True:
+            p = pathlib.Path("../checkpoints_june6_test")
+            fn = "encoder.pt" # I don't know what is your fn
+            filepath = p / fn
+            encoder1 = torch.load(filepath)
 
-        #     fn = "decoder.pt" # I don't know what is your fn
-        #     filepath = p / fn
-        #     attn_decoder1 = torch.load(filepath)
+            fn = "decoder.pt" # I don't know what is your fn
+            filepath = p / fn
+            attn_decoder1 = torch.load(filepath)
 
         # input_sentence = raw_input("Enter a command: ")
         # output_words, attentions = evaluate(input_lang, output_lang, encoder1, attn_decoder1, input_sentence,
                                             # MAX_LENGTH)
         # print('input =', input_sentence)
         # print('output =', ' '.join(output_words))
-        crossValidation(input_lang, output_lang, encoder1, attn_decoder1, pairs, MAX_LENGTH, lang2ltl=is_lang2ltl, is_load = False) #False)
-        evaluateRandomly(input_lang, output_lang, encoder1, attn_decoder1, valid_iter, MAX_LENGTH)
+        # crossValidation(input_lang, output_lang, encoder1, attn_decoder1, pairs, MAX_LENGTH, lang2ltl=is_lang2ltl, is_load = False) #False)
+        if SUBSET:
+            # train_samples = []
+            n_folds = 5
+            f = 0
+            subset_samples = random.choices(pairs["train"][0], k=857)
+            # print(len(subset_samples))
+            fold_range = list(range(0, len(subset_samples), int(len(subset_samples) / n_folds)))
+            fold_range.append(len(subset_samples))
+            # print(type(samples))
+            # print("f is:", f)
+            # print("fold is:", fold_range)
+            train_samples = subset_samples[:fold_range[f]] + subset_samples[fold_range[f + 1]:] ## train on 4 
+            val_samples = subset_samples[fold_range[f]:fold_range[f + 1]]
+
+            subset_pairs = {"train": [train_samples],
+                            "valid": [val_samples]}
+            evaluateRandomly(input_lang, output_lang, encoder1, attn_decoder1, subset_pairs, MAX_LENGTH)
+        else:
+            evaluateRandomly(input_lang, output_lang, encoder1, attn_decoder1, pairs, MAX_LENGTH)
 
     elif MODE == 0:
         trainIters(input_lang, output_lang, encoder1, attn_decoder1, pairs, 10000, MAX_LENGTH, print_every=500)
@@ -174,7 +197,7 @@ def main():
 
         print('Running cross validation on encoder and BA decoder...')
         # crossValidation(input_lang, output_lang, encoder1, attn_decoder1, pairs, MAX_LENGTH, lang2ltl=is_lang2ltl, is_load = args.is_load) #False)
-        crossValidation(input_lang, output_lang, glove_encoder, attn_decoder1, pairs, MAX_LENGTH, lang2ltl=is_lang2ltl, is_load = args.is_load) #False)
+        crossValidation(input_lang, output_lang, glove_encoder, attn_decoder1, pairs, MAX_LENGTH, lang2ltl=is_lang2ltl, is_load = args.is_load, subset=SUBSET) #False)
     elif MODE == 3:
         print('Running cross validation on encoder and vanilla decoder...')
         crossValidation(input_lang, output_lang, encoder1, decoder1, pairs, MAX_LENGTH)

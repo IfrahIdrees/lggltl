@@ -14,6 +14,7 @@ from train_langmod import *
 from operator import truediv
 import pandas as pd
 import json
+import spot
 
 SOS_token = 0
 EOS_token = 1
@@ -21,6 +22,9 @@ UNK_token = 2
 
 use_cuda = torch.cuda.is_available()
 import pathlib
+
+if use_cuda:
+    device = torch.device("cuda")
 
 
 def indexesFromSentence(lang, sentence):
@@ -99,8 +103,9 @@ def train(input_variable, target_variable, encoder, decoder, encoder_optimizer, 
     return loss.item() / target_length
 
 
-def trainIters(in_lang, out_lang, encoder, decoder, samples, n_iters, max_length, print_every=1000, plot_every=10000, learning_rate=0.000001, fold=None, epochs = 5, val_samples = None,
-                starting_iter = 0, starting_epoch = 0):
+def trainIters(in_lang, out_lang, encoder, decoder, samples, n_iters, max_length, 
+                print_every=1000, plot_every=10000, learning_rate=10**-4, fold=None, epochs = 10, val_samples = None,
+                starting_iter = 0, starting_epoch = 0, starting_epoch_loss = None): #0.000001
     start = time.time()
     plot_losses = []
     x_losses = []
@@ -112,11 +117,12 @@ def trainIters(in_lang, out_lang, encoder, decoder, samples, n_iters, max_length
 
     epoch_losses = []
     x_epoch_losses = []
-    # exit()
-    # start = True
     epoch = starting_epoch
-    # for epoch in range(epochs):
-    # print("before while")
+    
+    p = pathlib.Path("../checkpoints")
+    p.mkdir(parents=True, exist_ok=True)
+
+    isStart =  True
     while epoch < epochs:
         # print("starting epoch")
         encoder.train()
@@ -126,8 +132,17 @@ def trainIters(in_lang, out_lang, encoder, decoder, samples, n_iters, max_length
         plot_loss_total = 0  # Reset every plot_every
         i = starting_iter + 1
         
+        print(n_iters, i)
+        if isStart:
+            i = starting_iter + 1
+            isStart =  False
+        else:
+            i = 1
+
+        print("epoch", epoch, "i", i)
+        
         while i < n_iters:
-            # print(i)
+            # print("i", i)
             # exit()
         # for i in range(1, n_iters + 1):
             # if i == 143000:
@@ -148,6 +163,8 @@ def trainIters(in_lang, out_lang, encoder, decoder, samples, n_iters, max_length
                                             i, i / n_iters * 100, print_loss_avg))
             # print("i",i, "mod", i % print_every, i % plot_every)
             # print(print_every, plot_every)
+            # plot_losses.append(plot_loss_avg)
+            # x_losses.append(epoch*n_iters+ i)
             if i % plot_every == 0:
                 plot_loss_avg = plot_loss_total / plot_every
                 plot_losses.append(plot_loss_avg)
@@ -155,8 +172,6 @@ def trainIters(in_lang, out_lang, encoder, decoder, samples, n_iters, max_length
                 plot_loss_total = 0
                 print("plot losses are, ",plot_losses)
                 showPlot([x_losses,plot_losses], "training.png")
-                p = pathlib.Path("../checkpoints")
-                p.mkdir(parents=True, exist_ok=True)
                 fn = f"encoder_e{epoch}.pt" # save last epoch
                 filepath = p / fn
                 torch.save(encoder, filepath)
@@ -196,6 +211,10 @@ def trainIters(in_lang, out_lang, encoder, decoder, samples, n_iters, max_length
                     fp.write(json_object)
             i+=1
         
+        # plot_loss_avg = plot_loss_total / plot_every
+        # plot_losses.append(plot_loss_avg)
+        # x_losses.append(epoch*n_iters+ i)
+        # plot_loss_total = 0
         
         fn = f"encoder_e{epoch}.pt" # I don't know what is your fn
         filepath = p / fn
@@ -231,12 +250,20 @@ def trainIters(in_lang, out_lang, encoder, decoder, samples, n_iters, max_length
         fn = "meta_information.json" # I don't know what is your fn
         filepath = p / fn
         
-        dict = {
+        if len(plot_losses) == 0:
+            dict = {
             "fold": fold, 
             "epoch":epoch,
             "iter": i , 
-            "epoch_loss": plot_losses[-1]
-        }
+            "epoch_loss": starting_epoch_loss
+            }
+        else:
+            dict = {
+                "fold": fold, 
+                "epoch":epoch,
+                "iter": i , 
+                "epoch_loss": plot_losses[-1]
+            }
 
         # Serializing json
         json_object = json.dumps(dict, indent=4)
@@ -273,7 +300,7 @@ def evaluate(input_lang, output_lang, encoder, decoder, sentence, max_length, cr
     encoder_outputs = Variable(torch.zeros(max_length, encoder.hidden_size))
     encoder_outputs = encoder_outputs.cuda() if use_cuda else encoder_outputs
 
-    loss = 0
+    loss = torch.tensor([0.0]).to(device)
     for ei in range(input_length):
         encoder_output, encoder_hidden = encoder(input_variable[ei],
                                                  encoder_hidden)
@@ -288,6 +315,7 @@ def evaluate(input_lang, output_lang, encoder, decoder, sentence, max_length, cr
     decoder_attentions = torch.zeros(max_length, max_length)
 
     for di in range(max_length):
+        # print("index is", di)
         decoder_output, decoder_hidden, decoder_attention = decoder(
             decoder_input, decoder_hidden, encoder_outputs)
         if decoder_attention is not None:
@@ -308,6 +336,10 @@ def evaluate(input_lang, output_lang, encoder, decoder, sentence, max_length, cr
             if criterion != None:
                 loss += criterion(decoder_output, target_variable[di])
 
+    # print("max_length is", max_length)
+    # if loss == None:
+        # return(decoded_words, decoder_attentions[:di + 1], None)
+    # else:
     return decoded_words, decoder_attentions[:di + 1], loss.item() / target_length
 
 
@@ -377,10 +409,17 @@ def evaluate2(input_lang, output_lang, encoder, decoder, sentence, max_length):
 
 
 def evaluateRandomly(input_lang, output_lang, encoder, decoder, p, max_length, n=10):
+    print("length of p", len(p["valid"]))
+    valid_iter = p["valid"][0]
+    print("length of valid_iter", len(valid_iter))
+    # exit()
+    # random.seed(10)
     for i in range(n):
-        pair = random.choice(p)
+        pair = random.choice(valid_iter)
+        # pair = p[0]
         print('>', pair[0])
         print('=', pair[1])
+        # exit()
         # output_words, attentions = evaluate(input_lang, output_lang, encoder, decoder, pair[0], max_length)
         # output_words, attentions = evaluate(input_lang, output_lang, encoder, decoder, pair[0], max_length)
         output_words, attentions, current_loss = evaluate(input_lang, output_lang, encoder, decoder, pair[0], max_length, target_ltl = pair[1])
@@ -423,7 +462,7 @@ def resetWeights(m):
         m.reset_parameters()
 
 
-def crossValidation(in_lang, out_lang, encoder, decoder, samples, max_length, n_folds=5, lang2ltl = False, is_load = False):
+def crossValidation(in_lang, out_lang, encoder, decoder, samples, max_length, n_folds=5, lang2ltl = False, is_load = False, subset = False):
     correct, total = 0, 0
     if not lang2ltl:
         for _ in range(10):
@@ -450,12 +489,14 @@ def crossValidation(in_lang, out_lang, encoder, decoder, samples, max_length, n_
         starting_fold = json_object["fold"]
         starting_iter = json_object["iter"]
         starting_epoch = json_object["epoch"]
+        starting_epoch_loss = json_object["epoch_loss"]
         print("Starting epoch is", starting_epoch)
         # exit()
     else:
         starting_fold = 0
         starting_iter = 0
         starting_epoch = 0
+        starting_epoch_loss = None
 
     print('Starting {0}-fold cross validation'.format(n_folds))
     per_fold_accuracy = []
@@ -478,21 +519,37 @@ def crossValidation(in_lang, out_lang, encoder, decoder, samples, max_length, n_
         decoder.train()
 
         if lang2ltl:
-            train_samples = []
-            a.remove(f)
-            for fold in a:
-                train_samples.extend(samples["train"][fold]) #samples[f][0]
+            if subset:
+                train_samples = []
+                subset_samples = random.choices(samples["train"][0], k=857)
+                # print(len(subset_samples))
+                fold_range = list(range(0, len(subset_samples), int(len(subset_samples) / n_folds)))
+                fold_range.append(len(subset_samples))
+                # print(type(samples))
+                # print("f is:", f)
+                # print("fold is:", fold_range)
+                train_samples = subset_samples[:fold_range[f]] + subset_samples[fold_range[f + 1]:] ## train on 4 
+                val_samples = subset_samples[fold_range[f]:fold_range[f + 1]]
 
-            val_samples = samples["valid"][f] #samples[f][1]
+            else:
+                train_samples = []
+                a.remove(f)
+                for fold in a:
+                    train_samples.extend(samples["train"][fold]) #samples[f][0]
+
+                val_samples = samples["valid"][f] #samples[f][1]
         else:
             train_samples = samples[:fold_range[f]] + samples[fold_range[f + 1]:] ## train on 4 
             val_samples = samples[fold_range[f]:fold_range[f + 1]]
 
+        # print(len(train_samples))
+        # print(len(val_samples))
+        # exit()
         # learning_rate=0.00001
         # plot_every=20000
         criterion = trainIters(in_lang, out_lang, encoder, decoder, train_samples, 38930*4, max_length, 
                                 print_every=1000, plot_every=20000, fold=f, val_samples=val_samples,
-                                starting_iter= starting_iter, starting_epoch=starting_epoch)
+                                starting_iter= starting_iter, starting_epoch=starting_epoch, starting_epoch_loss = starting_epoch_loss)
 
         encoder.eval()
         decoder.eval()
@@ -520,6 +577,7 @@ def crossValidation(in_lang, out_lang, encoder, decoder, samples, max_length, n_
     per_fold_accuracy.append(std_accuracy)
     df.loc[len(df.index)] = per_fold_accuracy
     df.to_csv("../../results.csv")
+    return train_samples, val_samples
 
 
 def write_train_vs_test_hidden_params(in_lang, out_lang, encoder, decoder, train_samples, eval_samples, max_length):
