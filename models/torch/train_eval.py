@@ -123,6 +123,7 @@ def trainIters(in_lang, out_lang, encoder, decoder, samples, n_iters, max_length
     p.mkdir(parents=True, exist_ok=True)
 
     isStart =  True
+    # print("epoch is", epoch, epochs)
     while epoch < epochs:
         # print("starting epoch")
         encoder.train()
@@ -564,10 +565,10 @@ def crossValidation(in_lang, out_lang, encoder, decoder, samples, max_length, n_
         print('Cross validation fold #{0} Accuracy: {1}/{2} = {3}%'.format(f + 1, corr, tot, 100. * acc))
         fn = "meta_information.txt" # I don't know what is your fn
         filepath = p / fn
-        with filepath.open("a", encoding ="utf-8") as f:
+        with filepath.open("a", encoding ="utf-8") as fp:
             # f.writelines(f"fold: {fold}, epoch: {epoch}, iter: {i} , epoch loss: {epoch_losses[-1]}\n")
             # f.writelines('Fold #{0}, Epoch # {4} ,Val Accuracy: {1}/{2} = {3}%'.format(fold + 1, corr, tot, 100. * acc, epoch))
-            f.writelines('Fold ended - Cross validation fold #{0} Accuracy: {1}/{2} = {3}%'.format(f + 1, corr, tot, 100. * acc))
+            fp.writelines('\nFold ended - Cross validation fold #{0} Accuracy: {1}/{2} = {3}%'.format(f + 1, corr, tot, 100. * acc))
         
         
         correct += corr
@@ -584,21 +585,24 @@ def crossValidation(in_lang, out_lang, encoder, decoder, samples, max_length, n_
     print('Average {0}-fold Cross Validation Accuracy: {1}/{2} = {3}%'.format(n_folds, correct, total, mean_accuracy))
     print('{0}-fold Cross Validation Standard Deviation : {1}%'.format(n_folds, std_accuracy))
     
-    fn = "meta_information.txt" # I don't know what is your fn
-    filepath = p / fn
-    with filepath.open("a", encoding ="utf-8") as f:
-        # f.writelines(f"fold: {fold}, epoch: {epoch}, iter: {i} , epoch loss: {epoch_losses[-1]}\n")
-        # f.writelines('Fold #{0}, Epoch # {4} ,Val Accuracy: {1}/{2} = {3}%'.format(fold + 1, corr, tot, 100. * acc, epoch))
-        # f.writelines('Fold #{0}, Epoch # {2},Val Loss: {1}'.format(fold + 1, loss, epoch))
-        f.writelines('Average {0}-fold Cross Validation Accuracy: {1}/{2} = {3}%'.format(n_folds, correct, total, mean_accuracy))
-        f.writelines('{0}-fold Cross Validation Standard Deviation : {1}%'.format(n_folds, std_accuracy))
-    
-
     # print(per_fold_accuracy, type(per_fold_accuracy))
     # print(mean_accuracy, type(mean_accuracy))
     # print(std_accuracy, type(std_accuracy))
     per_fold_accuracy.append(mean_accuracy)
     per_fold_accuracy.append(std_accuracy)
+
+    fn = "meta_information.txt" # I don't know what is your fn
+    filepath = p / fn
+    with filepath.open("a", encoding ="utf-8") as fp:
+        # f.writelines(f"fold: {fold}, epoch: {epoch}, iter: {i} , epoch loss: {epoch_losses[-1]}\n")
+        # f.writelines('Fold #{0}, Epoch # {4} ,Val Accuracy: {1}/{2} = {3}%'.format(fold + 1, corr, tot, 100. * acc, epoch))
+        # f.writelines('Fold #{0}, Epoch # {2},Val Loss: {1}'.format(fold + 1, loss, epoch))
+        fp.writelines('\n Average {0}-fold Cross Validation Accuracy: {1}/{2} = {3}%'.format(n_folds, correct, total, mean_accuracy))
+        fp.writelines('{0}-fold Cross Validation Standard Deviation : {1}% \n'.format(n_folds, std_accuracy))
+        fp.writelines("   ".join(map(str, per_fold_accuracy)))
+
+
+
     df.loc[len(df.index)] = per_fold_accuracy
     df.to_csv("../../results.csv")
     return train_samples, val_samples
