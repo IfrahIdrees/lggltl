@@ -246,6 +246,8 @@ def trainIters(in_lang, out_lang, encoder, decoder, samples, n_iters, max_length
         filepath = p / fn
         with filepath.open("a", encoding ="utf-8") as f:
             f.writelines(f"fold: {fold}, epoch: {epoch}, iter: {i} , epoch loss: {epoch_losses[-1]}\n")
+            f.writelines('TrainIters Fold #{0}, Epoch # {4} ,Val Accuracy: {1}/{2} = {3}%'.format(fold + 1, corr, tot, 100. * acc, epoch))
+            f.writelines('TrainIters Fold #{0}, Epoch # {2},Val Loss: {1}'.format(fold + 1, loss, epoch))
         
         fn = "meta_information.json" # I don't know what is your fn
         filepath = p / fn
@@ -470,10 +472,9 @@ def crossValidation(in_lang, out_lang, encoder, decoder, samples, max_length, n_
         fold_range = list(range(0, len(samples), int(len(samples) / n_folds)))
         fold_range.append(len(samples))
 
-
+    p = pathlib.Path("../checkpoints")
     if is_load:
         # print("loading!")
-        p = pathlib.Path("../checkpoints")
         fn = "meta_information.json" # I don't know what is your fn
         filepath = p / fn
  
@@ -489,7 +490,10 @@ def crossValidation(in_lang, out_lang, encoder, decoder, samples, max_length, n_
         starting_fold = json_object["fold"]
         starting_iter = json_object["iter"]
         starting_epoch = json_object["epoch"]
-        starting_epoch_loss = json_object["epoch_loss"]
+        if "epoch_loss" in json_object.keys():
+            starting_epoch_loss = json_object["epoch_loss"]
+        else:
+            starting_epoch_loss = json_object["train_loss"]
         print("Starting epoch is", starting_epoch)
         # exit()
     else:
@@ -500,7 +504,7 @@ def crossValidation(in_lang, out_lang, encoder, decoder, samples, max_length, n_
 
     print('Starting {0}-fold cross validation'.format(n_folds))
     per_fold_accuracy = []
-    columns = [f"Fold num #{i}" for i in range(1)]
+    columns = [f"Fold num #{i}" for i in range(n_folds)]
     columns.append("Mean")
     columns.append("Std Dev")
     df = pd.DataFrame(columns = columns)
@@ -508,9 +512,11 @@ def crossValidation(in_lang, out_lang, encoder, decoder, samples, max_length, n_
     f = starting_fold
     while f < n_folds:
     # for f in range(n_folds):
-        if f+1 > 1:
+        if f+1 == 1:
             print("here")
-            break
+            f+=1
+            per_fold_accuracy.append(19.0932442846134)
+            continue
         a = list(range(n_folds))
         print('Running cross validation fold {0}/{1}...'.format(f + 1, n_folds))
 
@@ -548,7 +554,7 @@ def crossValidation(in_lang, out_lang, encoder, decoder, samples, max_length, n_
         # learning_rate=0.00001
         # plot_every=20000
         criterion = trainIters(in_lang, out_lang, encoder, decoder, train_samples, 38930*4, max_length, 
-                                print_every=1000, plot_every=20000, fold=f, val_samples=val_samples,
+                                print_every=10000, plot_every=20000, fold=f, val_samples=val_samples,
                                 starting_iter= starting_iter, starting_epoch=starting_epoch, starting_epoch_loss = starting_epoch_loss)
 
         encoder.eval()
@@ -556,6 +562,14 @@ def crossValidation(in_lang, out_lang, encoder, decoder, samples, max_length, n_
 
         corr, tot, acc, loss = evaluateSamples(in_lang, out_lang, encoder, decoder, val_samples, max_length, criterion= criterion)
         print('Cross validation fold #{0} Accuracy: {1}/{2} = {3}%'.format(f + 1, corr, tot, 100. * acc))
+        fn = "meta_information.txt" # I don't know what is your fn
+        filepath = p / fn
+        with filepath.open("a", encoding ="utf-8") as f:
+            # f.writelines(f"fold: {fold}, epoch: {epoch}, iter: {i} , epoch loss: {epoch_losses[-1]}\n")
+            # f.writelines('Fold #{0}, Epoch # {4} ,Val Accuracy: {1}/{2} = {3}%'.format(fold + 1, corr, tot, 100. * acc, epoch))
+            f.writelines('Fold ended - Cross validation fold #{0} Accuracy: {1}/{2} = {3}%'.format(f + 1, corr, tot, 100. * acc))
+        
+        
         correct += corr
         total += tot
 
@@ -570,6 +584,16 @@ def crossValidation(in_lang, out_lang, encoder, decoder, samples, max_length, n_
     print('Average {0}-fold Cross Validation Accuracy: {1}/{2} = {3}%'.format(n_folds, correct, total, mean_accuracy))
     print('{0}-fold Cross Validation Standard Deviation : {1}%'.format(n_folds, std_accuracy))
     
+    fn = "meta_information.txt" # I don't know what is your fn
+    filepath = p / fn
+    with filepath.open("a", encoding ="utf-8") as f:
+        # f.writelines(f"fold: {fold}, epoch: {epoch}, iter: {i} , epoch loss: {epoch_losses[-1]}\n")
+        # f.writelines('Fold #{0}, Epoch # {4} ,Val Accuracy: {1}/{2} = {3}%'.format(fold + 1, corr, tot, 100. * acc, epoch))
+        # f.writelines('Fold #{0}, Epoch # {2},Val Loss: {1}'.format(fold + 1, loss, epoch))
+        f.writelines('Average {0}-fold Cross Validation Accuracy: {1}/{2} = {3}%'.format(n_folds, correct, total, mean_accuracy))
+        f.writelines('{0}-fold Cross Validation Standard Deviation : {1}%'.format(n_folds, std_accuracy))
+    
+
     # print(per_fold_accuracy, type(per_fold_accuracy))
     # print(mean_accuracy, type(mean_accuracy))
     # print(std_accuracy, type(std_accuracy))

@@ -50,7 +50,7 @@ else:
 
 
 SEED = 0 #int(sys.argv[1])
-MODE = -1 #2 #-1 #2 ##-1 for manual check## 2 for cross validation,  #9 for learning curve - fig 3
+MODE = 2 #2 #-1 #2 ##-1 for manual check## 2 for cross validation,  #9 for learning curve - fig 3
 GLOVE = True
 random.seed(SEED)
 torch.manual_seed(SEED) if not use_cuda else torch.cuda.manual_seed(SEED)
