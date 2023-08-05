@@ -29,7 +29,7 @@ def parseArguments():
         "--src_dir_path", type=str, default="../../data/osm/lang2ltl/boston/",
         help="src path")
     parser_upload.add_argument(
-        "--is_load", type=bool, default=False,
+        "--is_load", type=bool, default=True,
         help="is_load")
     
     # is_load = False
@@ -52,6 +52,7 @@ else:
 SEED = 0 #int(sys.argv[1])
 MODE = 2 #2 #-1 #2 ##-1 for manual check## 2 for cross validation,  #9 for learning curve - fig 3
 GLOVE = True
+CHECKPOINT_DIR = "../checkpoints_fold1"
 random.seed(SEED)
 torch.manual_seed(SEED) if not use_cuda else torch.cuda.manual_seed(SEED)
 print('Running with random seed {0}'.format(SEED))
@@ -71,7 +72,7 @@ if is_lang2ltl:
         index+=1
     # check if current path is a file
         filename = os.path.join(src, path)
-        if "utt" in filename and os.path.isfile(filename):
+        if "formula" in filename and os.path.isfile(filename):
             print("filename", filename)
             train_iter, valid_iter, curr_max_src_len, curr_max_tar_len  = readPkl(filename)
             pairs["train"].append(train_iter)
@@ -134,9 +135,47 @@ def main():
     # valid_iter = p["valid"][0]
     print("length of valid_iter", len(pairs["valid"][0]))
     # exit()
-    if MODE == -1:
+    if MODE == -2:
+        p = pathlib.Path(CHECKPOINT_DIR)
+        
+        # if args.is_load == True:
+        fn = "encoder.pt" # I don't know what is your fn
+        filepath = p / fn
+        encoder1 = torch.load(filepath)
+
+        fn = "decoder.pt" # I don't know what is your fn
+        filepath = p / fn
+        attn_decoder1 = torch.load(filepath)
+
+
+        encoder1.eval()
+        attn_decoder1.eval()
+
+        print("length of p", len(pairs["valid"]))
+        fold_num = 1
+        valid_iter = pairs["valid"][fold_num]
+        print("length of valid_iter", len(valid_iter))
+
+        # evaluateRandomly(input_lang, output_lang, encoder1, attn_decoder1, pairs, MAX_LENGTH)
+        corr, tot, acc, loss = evaluateSamples(input_lang, output_lang, encoder1, attn_decoder1, valid_iter, MAX_LENGTH, criterion= None)
+        print('Cross validation fold #{0} Accuracy: {1}/{2} = {3}%'.format(fold_num, corr, tot, 100. * acc))
+        fn = "meta_information.txt" # I don't know what is your fn
+        filepath = p / fn
+        with filepath.open("a", encoding ="utf-8") as fp:
+            # f.writelines(f"fold: {fold}, epoch: {epoch}, iter: {i} , epoch loss: {epoch_losses[-1]}\n")
+            # f.writelines('Fold #{0}, Epoch # {4} ,Val Accuracy: {1}/{2} = {3}%'.format(fold + 1, corr, tot, 100. * acc, epoch))
+            fp.writelines('\nEvaluate Fold ended - Cross validation fold #{0} Accuracy: {1}/{2} = {3}%'.format(fold_num, corr, tot, 100. * acc))
+        
+        
+        # correct += corr
+        # total += tot
+        print("per fold accuracy is", corr/tot * 100.)
+
+
+    elif MODE == -1:
         if args.is_load == True:
-            p = pathlib.Path("../checkpoints_june6_test")
+            checkpoint_dir = "../checkpoints_june6_test"
+            p = pathlib.Path(checkpoint_dir)
             fn = "encoder.pt" # I don't know what is your fn
             filepath = p / fn
             encoder1 = torch.load(filepath)
@@ -185,7 +224,7 @@ def main():
         print("is load ", args.is_load,)
         
         if args.is_load == True:
-            p = pathlib.Path("../checkpoints")
+            p = pathlib.Path(CHECKPOINT_DIR)
             fn = "encoder.pt" # I don't know what is your fn
             filepath = p / fn
             encoder1 = torch.load(filepath)
@@ -197,7 +236,7 @@ def main():
 
         print('Running cross validation on encoder and BA decoder...')
         # crossValidation(input_lang, output_lang, encoder1, attn_decoder1, pairs, MAX_LENGTH, lang2ltl=is_lang2ltl, is_load = args.is_load) #False)
-        crossValidation(input_lang, output_lang, glove_encoder, attn_decoder1, pairs, MAX_LENGTH, lang2ltl=is_lang2ltl, is_load = args.is_load, subset=SUBSET) #False)
+        crossValidation(input_lang, output_lang, glove_encoder, attn_decoder1, pairs, MAX_LENGTH, lang2ltl=is_lang2ltl, is_load = args.is_load, subset=SUBSET, checkpoint_dir=CHECKPOINT_DIR) #False)
     elif MODE == 3:
         print('Running cross validation on encoder and vanilla decoder...')
         crossValidation(input_lang, output_lang, encoder1, decoder1, pairs, MAX_LENGTH)

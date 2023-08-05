@@ -14,7 +14,7 @@ from train_langmod import *
 from operator import truediv
 import pandas as pd
 import json
-import spot
+# import spot
 
 SOS_token = 0
 EOS_token = 1
@@ -105,7 +105,7 @@ def train(input_variable, target_variable, encoder, decoder, encoder_optimizer, 
 
 def trainIters(in_lang, out_lang, encoder, decoder, samples, n_iters, max_length, 
                 print_every=1000, plot_every=10000, learning_rate=10**-4, fold=None, epochs = 10, val_samples = None,
-                starting_iter = 0, starting_epoch = 0, starting_epoch_loss = None): #0.000001
+                starting_iter = 0, starting_epoch = 0, starting_epoch_loss = None, checkpoint_dir = "../checkpoints"): #0.000001
     start = time.time()
     plot_losses = []
     x_losses = []
@@ -119,7 +119,7 @@ def trainIters(in_lang, out_lang, encoder, decoder, samples, n_iters, max_length
     x_epoch_losses = []
     epoch = starting_epoch
     
-    p = pathlib.Path("../checkpoints")
+    p = pathlib.Path(checkpoint_dir)
     p.mkdir(parents=True, exist_ok=True)
 
     isStart =  True
@@ -444,8 +444,9 @@ def evaluateTraining(input_lang, output_lang, encoder, decoder, pairs, max_lengt
     print('Training Accuracy: {0}/{1} = {2}%'.format(corr, tot, corr / tot))
 
 
-def evaluateSamples(input_lang, output_lang, encoder, decoder, samples, max_length, criterion=None):
+def evaluateSamples(input_lang, output_lang, encoder, decoder, samples, max_length, criterion=None, checkpoint_dir = "../checkpoints"):
     corr, tot, loss = 0, 0, 0
+    total_length=len(samples)
     for p in samples:
         output_words, attentions, current_loss = evaluate(input_lang, output_lang, encoder, decoder, p[0], max_length, criterion = criterion, target_ltl = p[1])
         output_words = ' '.join(output_words[:-1])
@@ -455,6 +456,18 @@ def evaluateSamples(input_lang, output_lang, encoder, decoder, samples, max_leng
             corr += 1
         # else:
             # print((p[0], output_words, p[1]))
+
+        if tot % 10000 == 0:
+            p = pathlib.Path(checkpoint_dir)
+            p.mkdir(parents=True, exist_ok=True)
+            fn = "meta_information.txt" # I don't know what is your fn
+            filepath = p / fn
+            with filepath.open("a", encoding ="utf-8") as f:
+                # f.writelines(f"fold: {fold}, epoch: {epoch}, iter: {i} , epoch loss: {epoch_losses[-1]}\n")
+                # f.writelines('TrainIters Fold #{0}, Epoch # {4} ,Val Accuracy: {1}/{2} = {3}%'.format(fold + 1, corr, tot, 100. * acc, epoch))
+                # f.writelines('TrainIters Fold #{0}, Epoch # {2},Val Loss: {1}'.format(fold + 1, loss, epoch))
+                f.writelines("Validation progress made, fold. iter: {tot}\n")
+
         tot += 1
     loss = loss/len(samples)
     return corr, tot, corr / tot, loss
@@ -465,7 +478,7 @@ def resetWeights(m):
         m.reset_parameters()
 
 
-def crossValidation(in_lang, out_lang, encoder, decoder, samples, max_length, n_folds=5, lang2ltl = False, is_load = False, subset = False):
+def crossValidation(in_lang, out_lang, encoder, decoder, samples, max_length, n_folds=5, lang2ltl = False, is_load = False, subset = False, checkpoint_dir ="../checkpoints"):
     correct, total = 0, 0
     if not lang2ltl:
         for _ in range(10):
@@ -473,7 +486,9 @@ def crossValidation(in_lang, out_lang, encoder, decoder, samples, max_length, n_
         fold_range = list(range(0, len(samples), int(len(samples) / n_folds)))
         fold_range.append(len(samples))
 
-    p = pathlib.Path("../checkpoints")
+    
+    p = pathlib.Path(checkpoint_dir)
+    print("after checkpoint dir")
     if is_load:
         # print("loading!")
         fn = "meta_information.json" # I don't know what is your fn
@@ -513,11 +528,27 @@ def crossValidation(in_lang, out_lang, encoder, decoder, samples, max_length, n_
     f = starting_fold
     while f < n_folds:
     # for f in range(n_folds):
-        if f+1 == 1:
+        # if f+1 == 1:
+        #     print("here")
+        #     f+=1
+        #     per_fold_accuracy.append(0)
+        #     continue
+        # if f+1 == 2:
+        #     print("here")
+        #     f+=1
+        #     per_fold_accuracy.append(36.296373272368285)
+        #     continue
+        if f+1 == 3:
             print("here")
             f+=1
-            per_fold_accuracy.append(19.0932442846134)
+            per_fold_accuracy.append(19.79594769363414)
             continue
+        if f+1 == 4:
+            print("here")
+            f+=1
+            per_fold_accuracy.append(13.786048804535369)
+            continue
+        
         a = list(range(n_folds))
         print('Running cross validation fold {0}/{1}...'.format(f + 1, n_folds))
 
@@ -556,7 +587,7 @@ def crossValidation(in_lang, out_lang, encoder, decoder, samples, max_length, n_
         # plot_every=20000
         criterion = trainIters(in_lang, out_lang, encoder, decoder, train_samples, 38930*4, max_length, 
                                 print_every=10000, plot_every=20000, fold=f, val_samples=val_samples,
-                                starting_iter= starting_iter, starting_epoch=starting_epoch, starting_epoch_loss = starting_epoch_loss)
+                                starting_iter= starting_iter, starting_epoch=starting_epoch, starting_epoch_loss = starting_epoch_loss, checkpoint_dir=checkpoint_dir)
 
         encoder.eval()
         decoder.eval()
